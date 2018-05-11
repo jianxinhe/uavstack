@@ -58,6 +58,7 @@ public class OpentsdbDataStore extends AbstractDataStore<HttpAsyncClient> {
         private String addressEntry;
 
         public InsertCallBack(OpentsdbDataStore ds, String addressEntry, byte[] batchData) {
+
             this.batchData = batchData;
             this.ds = ds;
             this.addressEntry = addressEntry;
@@ -70,8 +71,8 @@ public class OpentsdbDataStore extends AbstractDataStore<HttpAsyncClient> {
             int retcode = result.getRetCode();
 
             if (log.isTraceEnable()) {
-                log.warn(this, "DataStore INSERT FAIL: datalen=" + this.batchData.length + ",rc=" + retcode + ",rmsg="
-                        + retmsg);
+                log.info(this, "DataStore INSERT SUCCESS: datalen=" + this.batchData.length + ",rc=" + retcode
+                        + ",rmsg=" + retmsg);
             }
         }
 
@@ -124,6 +125,7 @@ public class OpentsdbDataStore extends AbstractDataStore<HttpAsyncClient> {
         private int queryState = ACTIONFAIL;
 
         public QueryCallBack(DataStoreMsg msg, OpentsdbDataStore dataStore, CountDownLatch cdl, String queryJson) {
+
             this.cdl = cdl;
             this.queryJson = queryJson;
             this.dataStore = dataStore;
@@ -166,7 +168,12 @@ public class OpentsdbDataStore extends AbstractDataStore<HttpAsyncClient> {
 
                 reply = DataStoreHelper.decodeForOpenTSDB(reply);
 
-                list = JSONHelper.toObject(reply, List.class, true);
+                try {
+                    list = JSONHelper.toObject(reply, List.class, true);
+                }
+                catch (Exception e) {
+                    log.err(this, "OPENTSDB QUERY DATA CONVERT INTO LIST FAIL:data=" + reply, e);
+                }
             }
 
             cdl.countDown();
@@ -186,7 +193,7 @@ public class OpentsdbDataStore extends AbstractDataStore<HttpAsyncClient> {
 
     private static final String HTTP_HEAD = "http://";
     private static final String HTTP_QUERY = "/api/query";
-    private static final String HTTP_PUT_PREFIX = "/api/put";
+    private static final String HTTP_PUT_PREFIX = "/api/put?summary";
 
     private static final int ACTIONOK = 2;
     private static final int ACTIONFAIL = 0;
@@ -375,7 +382,12 @@ public class OpentsdbDataStore extends AbstractDataStore<HttpAsyncClient> {
         this.datasource.getSourceConnect().doAsyncHttpPost(queryURL, datab, "application/json", "utf-8", queryCallBack);
 
         try {
-            cdl.await(10, TimeUnit.SECONDS);
+            /**
+             * 因为是异步http（http 有超时设置），因此等待http处理完。
+             * 
+             * 由callback里CountDownLatch.countDown()来结束等待
+             */
+            cdl.await();
         }
         catch (InterruptedException e) {
             log.err(this, "DataStore QUERY InterruptedException.", e);

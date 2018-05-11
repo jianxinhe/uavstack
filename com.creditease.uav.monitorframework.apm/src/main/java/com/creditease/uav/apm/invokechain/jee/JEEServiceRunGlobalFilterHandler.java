@@ -26,7 +26,7 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.creditease.agent.helpers.ReflectHelper;
+import com.creditease.agent.helpers.ReflectionHelper;
 import com.creditease.agent.helpers.StringHelper;
 import com.creditease.monitor.UAVServer;
 import com.creditease.monitor.captureframework.spi.CaptureConstants;
@@ -47,6 +47,7 @@ import com.creditease.uav.util.MonitorServerUtil;
 public class JEEServiceRunGlobalFilterHandler extends AbsJEEGlobalFilterHandler {
 
     public JEEServiceRunGlobalFilterHandler(String id) {
+
         super(id);
     }
 
@@ -91,17 +92,11 @@ public class JEEServiceRunGlobalFilterHandler extends AbsJEEGlobalFilterHandler 
         // 重调用链开启时添加warpper
         if (UAVServer.instance().isExistSupportor("com.creditease.uav.apm.supporters.SlowOperSupporter")) {
 
-            RewriteIvcResponseWrapper responseWrapper = new RewriteIvcResponseWrapper(response, "IVC_DAT");
-
-            context.put(InterceptConstants.HTTPRESPONSE, responseWrapper);
-
-            // 由于application/x-www-form-urlencoded
-            // 形式传参时获取inputsteam会删除parameters，故在添加wrapper时先通过调用getParameterMap方法lock（tomcat源码进行）parameters
-            request.getParameterMap();
-
             RewriteIvcRequestWrapper requestWrapper = new RewriteIvcRequestWrapper(request, "IVC_DAT");
-
             context.put(InterceptConstants.HTTPREQUEST, requestWrapper);
+
+            RewriteIvcResponseWrapper responseWrapper = new RewriteIvcResponseWrapper(response, "IVC_DAT");
+            context.put(InterceptConstants.HTTPRESPONSE, responseWrapper);
 
             args = new Object[] { requestWrapper, responseWrapper };
         }
@@ -126,7 +121,7 @@ public class JEEServiceRunGlobalFilterHandler extends AbsJEEGlobalFilterHandler 
         }
 
         String clientip = MonitorServerUtil.getClientIP(httprequest.getRemoteAddr(),
-                httprequest.getHeader("X-Forward-For"));
+                httprequest.getHeader("X-Forwarded-For"));
 
         // put intercept context
         params.put(InvokeChainConstants.PARAM_INTECEPTCONTEXT, context);
@@ -175,11 +170,11 @@ public class JEEServiceRunGlobalFilterHandler extends AbsJEEGlobalFilterHandler 
             return response.getStatus();
         }
         catch (Error e) {
-            Object resp = ReflectHelper.getField(response.getClass(), response, "response");
+            Object resp = ReflectionHelper.getField(response.getClass(), response, "response");
 
             if (resp != null) {
-                Object result = ReflectHelper.invoke("org.apache.catalina.connector.Response", resp, "getStatus", null,
-                        null, response.getClass().getClassLoader());
+                Object result = ReflectionHelper.invoke("org.apache.catalina.connector.Response", resp, "getStatus",
+                        null, null, response.getClass().getClassLoader());
 
                 return (Integer) result;
             }

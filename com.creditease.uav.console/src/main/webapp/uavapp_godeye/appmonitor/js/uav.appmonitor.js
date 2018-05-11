@@ -1258,6 +1258,35 @@ var mvcObj={
 			theme: 'BGLight',
 			order: 1005
 		});
+		// build Thread Analysis Multi Dump Window 
+		window.winmgr.build({
+			id: 'AppJTAMultiDumpWnd',
+			height: 'auto',
+			'overflow-y': 'auto',
+			theme: 'BGLight',
+			order: 1006
+		});
+		// build Thread Analysis Graph Window
+		window.winmgr.build({
+			id: 'AppJTAGraphWnd',
+			height: 'auto',
+			'overflow-y': 'auto',
+			theme: 'BGLight',
+			order: 1007,
+			events:{
+				onresize:function(w,h,noTopHeight) {
+					appJTA.resize(w,h,noTopHeight);
+				}
+			}
+		});
+		// build Thread Analysis Message Windows
+		window.winmgr.build({
+			id: 'AppJTAMsgWnd',
+			height: 'auto',
+			'overflow-y': 'auto',
+			theme: 'BGLight',
+			order: 1008
+		});
 		
 		//View Change
 		var view=HtmlHelper.getQParam("view");
@@ -1346,13 +1375,18 @@ var mvcObj={
 					 nodeInfoObj["id"]=key;
 					 
 					 var appgroup=nodeInfoObj["appgroup"];
+					 var appid=nodeInfoObj["appid"];
 					 
 					 if (appgroup==undefined||appgroup=="") {
 						 ungroupNodes[ungroupNodes.length]=nodeInfoObj;
 					 }
 					 else {
 						 var ip=nodeInfoObj["ip"];
-						 ipToAppGroup[ip]=appgroup;
+						 if(ipToAppGroup[ip]==undefined){
+							 ipToAppGroup[ip]=[];
+						 }
+							 						 
+						 ipToAppGroup[ip][appid]=appgroup; 
 					 }					 
 					 
 					 nodeArray[nodeArray.length]=nodeInfoObj;
@@ -1362,8 +1396,8 @@ var mvcObj={
 				 for(var i=0;i<ungroupNodes.length;i++) {
 					 var ip=ungroupNodes[i]["ip"];
 					 if (ipToAppGroup[ip]!=undefined) {
-						 ungroupNodes[i]["appgroup"]=ipToAppGroup[ip];
-						 ungroupNodes[i]["appgpid"]=ipToAppGroup[ip]+":"+ungroupNodes[i]["appid"];
+						 ungroupNodes[i]["appgroup"]=ipToAppGroup[ip][appid];
+						 ungroupNodes[i]["appgpid"]=ungroupNodes[i]["appgroup"]+":"+appid;
 					 }
 				 }
 				 
@@ -2197,7 +2231,21 @@ var mvcObj={
 					  * Application need auto group
 					  */
 					 if (type=="app") {
-						 var appgroup=monitorCfg.app.ipToAppGroup[appO["ip"]];
+						 var appid;
+						 var index=id.lastIndexOf("---");
+
+						 // for jee,mscp,springboot
+						 if(index!=-1){
+							 appid=id.substring(index+3,id.length);
+						 }
+
+						 // for jse
+						 if(appid==undefined){
+							 index=id.lastIndexOf("-");
+							 appid=id.substring(0,index).split("/").pop();
+						 }
+
+						 var appgroup=monitorCfg.app.ipToAppGroup[appO["ip"]][appid];
 						 
 						 if (appgroup!=undefined) {
 							 appO["appgroup"]=appgroup;
@@ -2503,7 +2551,7 @@ var mvcObj={
     			
     			var metric=metrics[i];
     			
-    			if(mprefix=="clientResp"&&metric=="RC"||mprefix!="clientResp"&&metric=="AC"){
+    			if(mprefix=="clientResp"&&metric=="RC"||mprefix!="clientResp"&&metric=="AC"||mprefix!="clientResp"&&metric=="EXT"){
     				continue;
     			}
     			
@@ -3972,6 +4020,11 @@ var mvcObj={
 			for(var cptservice in cptservices) {
 			
 				var serviceURLs=cptservices[cptservice];
+				
+				//don't show the servicComp in appInstChart when serviceurl begin with @ (means there is no servlet-mapping for this serviceComp)
+				if (serviceURLs.length==0||serviceURLs[0].indexOf('@')==0){
+					continue;
+				}
 				
 				var sObj={name:cptservice,urls:serviceURLs,ip:jsonObj.ip,svrid:jsonObj.svrid};
 				
@@ -5694,24 +5747,54 @@ var mvcObj={
          */
         // -------------------- thread analysis list window --------------------
         buildAppJTAListWnd: function(sObj) {
-			return appJTA.buildAppJTAListWnd(sObj);
-		},
-		runAppJTAListWnd: function(sObj) {
-			appJTA.runAppJTAListWnd(sObj);
-		},
-		destroyAppJTAListWnd: function() {
-			// ignore
-		},
+            return appJTA.buildAppJTAListWnd(sObj);
+        },
+        runAppJTAListWnd: function(sObj) {
+            appJTA.runAppJTAListWnd(sObj);
+        },
+        destroyAppJTAListWnd: function() {
+            // ignore
+        },
         // -------------------- thread analysis detail window --------------------
-		buildAppJTADetailWnd: function(sObj) {
-			return appJTA.buildAppJTADetailWnd(sObj);
-		},
-		runAppJTADetailWnd: function(sObj) {
-			appJTA.runAppJTADetailWnd(sObj);
-		},
-		destroyAppJTADetailWnd: function() {
-			// ignore
-		}
+        buildAppJTADetailWnd: function(sObj) {
+            return appJTA.buildAppJTADetailWnd(sObj);
+        },
+        runAppJTADetailWnd: function(sObj) {
+            appJTA.runAppJTADetailWnd(sObj);
+        },
+        destroyAppJTADetailWnd: function() {
+            // ignore
+        },
+        // -------------------- thread analysis multi dump window --------------------
+        buildAppJTAMultiDumpWnd: function(sObj) {
+            return appJTA.buildJTAMultiDumpWnd(sObj);
+        },
+        runAppJTAMultiDumpWnd: function(sObj) {
+            appJTA.runJTAMultiDumpWnd(sObj);
+        },
+        destroyAppJTAMultiDumpWnd: function() {
+            // ignore
+        },
+        // -------------------- thread analysis graph window --------------------
+        buildAppJTAGraphWnd: function(sObj) {
+            return appJTA.buildAppJTAGraphWnd(sObj);
+        },
+        runAppJTAGraphWnd: function(sObj) {
+            appJTA.runAppJTAGraphWnd(sObj);
+        },
+        destroyAppJTAGraphWnd: function(sObj) {
+            // ignore
+        },
+        // -------------------- thread analysis graph window --------------------
+        buildAppJTAMsgWnd: function(sObj) {
+        	return appJTA.buildJTAMsgWnd(sObj);
+        },
+        runAppJTAMsgWnd: function(sObj) {
+        	appJTA.runJTAMsgWnd(sObj);
+        },
+        destroyAppJTAMsgWnd: function() {
+        	// ignore
+        }
 	}	
 };
 
